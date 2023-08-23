@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * @param {string} line
  */
@@ -13,29 +15,36 @@ function parseVertexLine(line) {
  * @returns {number[][]}
  */
 function parseFacePoints(line) {
-  const points = line
+  return line
     .split(" ")
     .slice(1)
-    .map((part) =>
-      part.split("/").map((i) => {
+    .map((part) => {
+      const [v, texture = NaN, normal = NaN] = part.split("/").map((i) => {
         // -1 for conversion to zero-based index
         return parseInt(i) - 1;
-      })
-    );
+      });
 
-  return points;
+      return [v, texture, normal];
+    });
 }
 
 /**
  * @param {string} model
- * @typedef {{indexes: number[], vertices: number[]}} Geometry
+ * @typedef {{vertices: number[], normals: number[]}} Geometry
  * @returns {Geometry}
  */
 export function parseObjGeometry(model) {
+  /**
+   * @type Array<Array<number>>
+   */
   const vertices = [];
   const textures = [];
   const normals = [];
-  const indexes = [];
+
+  /**
+   * @type Array<Array<Array<number>>>
+   */
+  const faces = [];
 
   for (let line of model.split("\n")) {
     line = line.trim();
@@ -44,18 +53,18 @@ export function parseObjGeometry(model) {
     }
 
     if (line.startsWith("v ")) {
-      vertices.push(...parseVertexLine(line));
+      vertices.push(parseVertexLine(line));
     } else if (line.startsWith("vt ")) {
-      textures.push(...parseVertexLine(line));
+      textures.push(parseVertexLine(line));
     } else if (line.startsWith("vn ")) {
-      normals.push(...parseVertexLine(line));
+      normals.push(parseVertexLine(line));
     } else if (line.startsWith("f ")) {
       const points = parseFacePoints(line);
 
-      indexes.push(points[0][0], points[1][0], points[2][0]);
+      faces.push([points[0], points[1], points[2]]);
 
       if (points.length === 4) {
-        indexes.push(points[0][0], points[2][0], points[3][0]);
+        faces.push([points[0], points[2], points[3]]);
       } else if (points.length > 4) {
         // TODO: Generalize to more points
         throw new Error("Cannot handle faces with more points than 4");
@@ -63,8 +72,20 @@ export function parseObjGeometry(model) {
     }
   }
 
-  return {
-    indexes,
-    vertices,
-  };
+  /** @type {Geometry} */
+  const result = { vertices: [], normals: [] };
+
+  for (const face of faces) {
+    result.vertices.push(...vertices[face[0][0]]);
+    result.vertices.push(...vertices[face[1][0]]);
+    result.vertices.push(...vertices[face[2][0]]);
+
+    if (!isNaN(face[0][2])) {
+      result.normals.push(...normals[face[0][2]]);
+      result.normals.push(...normals[face[1][2]]);
+      result.normals.push(...normals[face[2][2]]);
+    }
+  }
+
+  return result;
 }

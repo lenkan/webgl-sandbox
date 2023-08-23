@@ -3,18 +3,26 @@ import { parseObjGeometry } from "./obj-loader.mjs";
 
 const vertexShaderSource = `
 attribute vec3 position;
+attribute vec3 normal;
+
 uniform mat4 modelViewMatrix;
+
+varying vec3 v_normal;
 
 void main() {
   gl_Position = modelViewMatrix * vec4(position, 1);
+  v_normal = mat3(modelViewMatrix) * normal;
 }
 `;
 
 const fragmentShaderSource = `
 precision mediump float;
 
-void main() {
-  gl_FragColor = vec4(1, 0, 0, 1);
+varying vec3 v_normal;
+
+void main () {
+  float light = dot(vec3(1, -1, 0), normalize(v_normal)) * 0.5 + 0.5;
+  gl_FragColor = vec4(vec3(1, 0, 0) * light, 1);
 }
 `;
 
@@ -53,23 +61,24 @@ async function renderTeapot() {
 
   const teapotGeometry = parseObjGeometry(teapotText);
 
-  const index = context.createBuffer();
-  context.bindBuffer(context.ELEMENT_ARRAY_BUFFER, index);
-  context.bufferData(context.ELEMENT_ARRAY_BUFFER, new Uint16Array(teapotGeometry.indexes), context.STATIC_DRAW);
+  const program = setupShaderProgram(context);
+  context.useProgram(program);
 
   const position = context.createBuffer();
   context.bindBuffer(context.ARRAY_BUFFER, position);
   context.bufferData(context.ARRAY_BUFFER, new Float32Array(teapotGeometry.vertices), context.STATIC_DRAW);
-  console.log(teapotGeometry);
 
-  // Use the red shader program
-  const program = setupShaderProgram(context);
-  context.useProgram(program);
-
-  // Bind position to it shader attribute
   const positionLocation = context.getAttribLocation(program, "position");
   context.enableVertexAttribArray(positionLocation);
   context.vertexAttribPointer(positionLocation, 3, context.FLOAT, false, 0, 0);
+
+  const normals = context.createBuffer();
+  context.bindBuffer(context.ARRAY_BUFFER, normals);
+  context.bufferData(context.ARRAY_BUFFER, new Float32Array(teapotGeometry.normals), context.STATIC_DRAW);
+
+  const normalLocation = context.getAttribLocation(program, "normal");
+  context.enableVertexAttribArray(normalLocation);
+  context.vertexAttribPointer(normalLocation, 3, context.FLOAT, false, 0, 0);
 
   const firstFrame = performance.now();
 
@@ -101,7 +110,7 @@ async function renderTeapot() {
       ])
     );
 
-    context.drawElements(context.TRIANGLES, teapotGeometry.indexes.length, context.UNSIGNED_SHORT, 0);
+    context.drawArrays(context.TRIANGLES, 0, teapotGeometry.vertices.length);
     context.flush();
 
     requestAnimationFrame(renderLoop);
