@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "@types/node": "^20.5.3",
+    "serve": "^14.2.1"
+  },
+  "scripts": {
+    "start": "serve www",
+    "test": "node --test www/js"
+  }
+}

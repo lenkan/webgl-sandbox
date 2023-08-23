@@ -1,79 +1,5 @@
 "use strict";
-
-/**
- * @param {string} line
- */
-function parseVertexLine(line) {
-  return line
-    .split(" ")
-    .slice(1, 4)
-    .map((i) => parseFloat(i));
-}
-
-/**
- * @param {string} line
- * @returns {number[][]}
- */
-function parseFacePoints(line) {
-  const points = line
-    .split(" ")
-    .slice(1)
-    .map((part) =>
-      part.split("/").map((i) => {
-        // -1 for conversion to zero-based index
-        return parseInt(i) - 1;
-      })
-    );
-
-  return points;
-}
-
-/**
- * @typedef {{indexes: Uint16Array, vertices: Float32Array}} Geometry
- * @returns {Promise<Geometry>}
- */
-async function loadTeapotGeometry() {
-  const model = new URL(window.location.href).searchParams.get("model") || "teapot";
-
-  const teapotResponse = await fetch(`/${model}.obj`);
-  const teapotText = await teapotResponse.text();
-
-  const vertices = [];
-  const textures = [];
-  const normals = [];
-  const indexes = [];
-
-  for (let line of teapotText.split("\n")) {
-    line = line.trim();
-    if (line.length === 0 || line.startsWith("#")) {
-      continue;
-    }
-
-    if (line.startsWith("v ")) {
-      vertices.push(...parseVertexLine(line));
-    } else if (line.startsWith("vt ")) {
-      textures.push(...parseVertexLine(line));
-    } else if (line.startsWith("vn ")) {
-      normals.push(...parseVertexLine(line));
-    } else if (line.startsWith("f ")) {
-      const points = parseFacePoints(line);
-
-      indexes.push(points[0][0], points[1][0], points[2][0]);
-
-      if (points.length === 4) {
-        indexes.push(points[0][0], points[2][0], points[3][0]);
-      } else if (points.length > 4) {
-        // TODO: Generalize to more points
-        throw new Error("Cannot handle faces with more points than 4");
-      }
-    }
-  }
-
-  return {
-    indexes: new Uint16Array(indexes),
-    vertices: new Float32Array(vertices),
-  };
-}
+import { parseObjGeometry } from "./obj-loader.mjs";
 
 const vertexShaderSource = `
 attribute vec3 position;
@@ -116,19 +42,24 @@ function setupShaderProgram(context) {
 }
 
 async function renderTeapot() {
+  const model = new URL(window.location.href).searchParams.get("model") || "teapot";
+
+  const teapotResponse = await fetch(`/models/${model}.obj`);
+  const teapotText = await teapotResponse.text();
+
   const canvas = document.getElementById("canvas");
   /** @type {WebGLRenderingContext} */
   const context = canvas.getContext("webgl");
 
-  const teapotGeometry = await loadTeapotGeometry();
+  const teapotGeometry = parseObjGeometry(teapotText);
 
   const index = context.createBuffer();
   context.bindBuffer(context.ELEMENT_ARRAY_BUFFER, index);
-  context.bufferData(context.ELEMENT_ARRAY_BUFFER, teapotGeometry.indexes, context.STATIC_DRAW);
+  context.bufferData(context.ELEMENT_ARRAY_BUFFER, new Uint16Array(teapotGeometry.indexes), context.STATIC_DRAW);
 
   const position = context.createBuffer();
   context.bindBuffer(context.ARRAY_BUFFER, position);
-  context.bufferData(context.ARRAY_BUFFER, teapotGeometry.vertices, context.STATIC_DRAW);
+  context.bufferData(context.ARRAY_BUFFER, new Float32Array(teapotGeometry.vertices), context.STATIC_DRAW);
   console.log(teapotGeometry);
 
   // Use the red shader program
