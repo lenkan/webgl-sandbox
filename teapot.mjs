@@ -3,11 +3,29 @@
 /**
  * @param {string} line
  */
-function parseVertex(line) {
+function parseVertexLine(line) {
   return line
     .split(" ")
     .slice(1, 4)
     .map((i) => parseFloat(i));
+}
+
+/**
+ * @param {string} line
+ * @returns {number[][]}
+ */
+function parseFacePoints(line) {
+  const points = line
+    .split(" ")
+    .slice(1)
+    .map((part) =>
+      part.split("/").map((i) => {
+        // -1 for conversion to zero-based index
+        return parseInt(i) - 1;
+      })
+    );
+
+  return points;
 }
 
 /**
@@ -32,23 +50,20 @@ async function loadTeapotGeometry() {
     }
 
     if (line.startsWith("v ")) {
-      vertices.push(...parseVertex(line));
+      vertices.push(...parseVertexLine(line));
     } else if (line.startsWith("vt ")) {
-      textures.push(parseVertex(line));
+      textures.push(...parseVertexLine(line));
     } else if (line.startsWith("vn ")) {
-      normals.push(parseVertex(line));
+      normals.push(...parseVertexLine(line));
     } else if (line.startsWith("f ")) {
-      const coords = line
-        .split(" ")
-        .slice(1)
-        .map((part) => part.split("/").map((i) => parseInt(i) - 1));
+      const points = parseFacePoints(line);
 
-      if (coords.length === 3) {
-        indexes.push(coords[0][0], coords[1][0], coords[2][0]);
-      } else if (coords.length === 4) {
-        indexes.push(coords[0][0], coords[1][0], coords[2][0]);
-        indexes.push(coords[0][0], coords[2][0], coords[3][0]);
-      } else {
+      indexes.push(points[0][0], points[1][0], points[2][0]);
+
+      if (points.length === 4) {
+        indexes.push(points[0][0], points[2][0], points[3][0]);
+      } else if (points.length > 4) {
+        // TODO: Generalize to more points
         throw new Error("Cannot handle faces with more points than 4");
       }
     }
@@ -105,25 +120,16 @@ async function renderTeapot() {
   /** @type {WebGLRenderingContext} */
   const context = canvas.getContext("webgl");
 
-  // Load teapot geometry
   const teapotGeometry = await loadTeapotGeometry();
 
-  // Bind indexes to ELEMENT_ARRAY_BUFFER
   const index = context.createBuffer();
   context.bindBuffer(context.ELEMENT_ARRAY_BUFFER, index);
   context.bufferData(context.ELEMENT_ARRAY_BUFFER, teapotGeometry.indexes, context.STATIC_DRAW);
 
-  // Bind vertices to ARRAY_BUFFER
   const position = context.createBuffer();
   context.bindBuffer(context.ARRAY_BUFFER, position);
   context.bufferData(context.ARRAY_BUFFER, teapotGeometry.vertices, context.STATIC_DRAW);
   console.log(teapotGeometry);
-
-  if (teapotGeometry.colors) {
-    const colorBuffer = context.createBuffer();
-    context.bindBuffer(context.ARRAY_BUFFER, colorBuffer);
-    context.bufferData(context.ARRAY_BUFFER, new Float32Array(teapotGeometry.colors), context.STATIC_DRAW);
-  }
 
   // Use the red shader program
   const program = setupShaderProgram(context);
@@ -134,12 +140,11 @@ async function renderTeapot() {
   context.enableVertexAttribArray(positionLocation);
   context.vertexAttribPointer(positionLocation, 3, context.FLOAT, false, 0, 0);
 
-  let firstFrame = performance.now();
+  const firstFrame = performance.now();
 
   const renderLoop = () => {
     const delta = performance.now() - firstFrame;
 
-    // Set a rotating model view matrix
     const modelViewMatrixLocation = context.getUniformLocation(program, "modelViewMatrix");
     const rotation = ((delta % 10000) / 10000) * Math.PI * 2;
     context.uniformMatrix4fv(
@@ -165,15 +170,12 @@ async function renderTeapot() {
       ])
     );
 
-    // Render the teapot
     context.drawElements(context.TRIANGLES, teapotGeometry.indexes.length, context.UNSIGNED_SHORT, 0);
     context.flush();
 
-    // Request another frame
     requestAnimationFrame(renderLoop);
   };
 
-  // Start the render loop
   requestAnimationFrame(renderLoop);
 }
 
