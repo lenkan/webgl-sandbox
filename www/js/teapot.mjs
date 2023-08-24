@@ -110,10 +110,6 @@ async function renderTeapot() {
       ])
     );
 
-    let gl = context;
-    context.enable(context.BLEND);
-    context.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    context.disable(context.DEPTH_TEST);
     context.drawArrays(context.TRIANGLES, 0, teapotGeometry.vertices.length);
     context.flush();
 
