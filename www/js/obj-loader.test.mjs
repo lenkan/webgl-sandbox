@@ -8,6 +8,7 @@ test("should parse empty obj file", () => {
   assert.deepEqual(result, {
     normals: [],
     vertices: [],
+    textures: [],
   });
 });
 

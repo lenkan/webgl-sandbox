@@ -21,7 +21,7 @@ precision mediump float;
 varying vec3 v_normal;
 
 void main () {
-  float light = dot(vec3(1, -1, 0), normalize(v_normal)) * 0.5 + 0.5;
+  float light = dot(normalize(vec3(1, -1, 0)), normalize(v_normal)) * 0.5 + 0.5;
   gl_FragColor = vec4(vec3(1, 0, 0) * light, 1);
 }
 `;
@@ -110,6 +110,10 @@ async function renderTeapot() {
       ])
     );
 
+    let gl = context;
+    context.enable(context.BLEND);
+    context.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    context.disable(context.DEPTH_TEST);
     context.drawArrays(context.TRIANGLES, 0, teapotGeometry.vertices.length);
     context.flush();
 
